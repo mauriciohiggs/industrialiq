@@ -1,0 +1,26 @@
+name: Feature request
+description: Propose a focused improvement to the learning experience.
+title: "[Feature]: "
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Learning problem
+      description: What is difficult or impossible today?
+    validations:
+      required: true
+  - type: textarea
+    id: outcome
+    attributes:
+      label: Desired outcome
+      description: Explain the learner outcome, not a prescribed implementation.
+    validations:
+      required: true
+  - type: dropdown
+    id: audience
+    attributes:
+      label: Who benefits?
+      options: ["New learners", "Returning learners", "Contributors", "Subject-matter experts", "All users"]
+    validations:
+      required: true
