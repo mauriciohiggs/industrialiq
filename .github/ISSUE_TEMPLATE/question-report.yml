@@ -1,0 +1,26 @@
+name: Question report
+description: Report a potentially incorrect answer or unclear explanation.
+title: "[Question]: "
+labels: ["content", "question-quality"]
+body:
+  - type: input
+    id: question-id
+    attributes:
+      label: Question ID
+      placeholder: Example: security-05
+    validations:
+      required: true
+  - type: textarea
+    id: problem
+    attributes:
+      label: What should be corrected?
+      description: Explain why the answer, choices, or explanation are inaccurate or unclear.
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Public evidence
+      description: Add an official documentation or other verifiable public reference.
+    validations:
+      required: true

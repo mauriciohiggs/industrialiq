@@ -79,6 +79,8 @@ Releases are built from `main` after the test, lint, and production-build gates 
 
 See [CHANGELOG.md](CHANGELOG.md) for release history and [SECURITY.md](SECURITY.md) for vulnerability reporting. The published site links to its privacy policy, terms, and disclaimer.
 
+The beta release includes a [public roadmap](public/roadmap.html) and [feedback guide](FEEDBACK.md). See [FIRST_100_USERS.md](FIRST_100_USERS.md) for the acquisition and learning-feedback loop and [ANALYTICS.md](ANALYTICS.md) for the privacy-preserving KPI plan.
+
 ## Contribute
 
 See [CONTRIBUTING.md](CONTRIBUTING.md). The question bank is [src/data/questions.json](src/data/questions.json). Topic metadata and official reference links are in [src/data/categories.ts](src/data/categories.ts).

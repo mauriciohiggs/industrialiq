@@ -1,0 +1,28 @@
+name: User feedback
+description: Share a learning-flow, usability, or general product observation.
+title: "[Feedback]: "
+labels: ["feedback"]
+body:
+  - type: markdown
+    attributes:
+      value: Do not include personal, credential, or sensitive industrial-system information.
+  - type: dropdown
+    id: stage
+    attributes:
+      label: Where did this happen?
+      options: ["Dashboard", "Flashcards", "Practice drill", "Exam", "Learning modules", "Progress", "Community", "Other"]
+    validations:
+      required: true
+  - type: textarea
+    id: observation
+    attributes:
+      label: What did you observe?
+      description: Describe the experience and what you expected.
+    validations:
+      required: true
+  - type: textarea
+    id: impact
+    attributes:
+      label: How did this affect your learning?
+    validations:
+      required: true

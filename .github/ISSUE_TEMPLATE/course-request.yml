@@ -1,0 +1,30 @@
+name: Course request
+description: Request a new industrial learning track or course.
+title: "[Course]: "
+labels: ["course-request"]
+body:
+  - type: dropdown
+    id: area
+    attributes:
+      label: Course area
+      options: ["Industrial automation", "OT cybersecurity", "Engineering", "Manufacturing", "Other"]
+    validations:
+      required: true
+  - type: input
+    id: topic
+    attributes:
+      label: Course or technology
+    validations:
+      required: true
+  - type: textarea
+    id: skills
+    attributes:
+      label: Skills or learning outcomes
+      description: List the practical capabilities learners should demonstrate.
+    validations:
+      required: true
+  - type: textarea
+    id: references
+    attributes:
+      label: Public references
+      description: Link official documentation or open educational resources.

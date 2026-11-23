@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: IndustrialIQ feedback guide
+    url: https://github.com/mauriciohiggs/industrialiq/blob/main/FEEDBACK.md
+    about: Read what to include and what not to share.
+  - name: Public roadmap
+    url: https://industrialiq-beta.vercel.app/roadmap.html
+    about: See what is live, next, requested, and still in research.
