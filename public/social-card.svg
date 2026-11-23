@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630" role="img" aria-labelledby="title desc">
+  <title id="title">IndustrialIQ</title>
+  <desc id="desc">Ignition Core learning track</desc>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop stop-color="#122727"/>
+      <stop offset="1" stop-color="#31543e"/>
+    </linearGradient>
+  </defs>
+  <rect width="1200" height="630" rx="36" fill="url(#bg)"/>
+  <circle cx="955" cy="315" r="205" fill="none" stroke="#8fac6c" stroke-opacity=".35" stroke-width="2"/>
+  <circle cx="955" cy="315" r="145" fill="none" stroke="#8fac6c" stroke-opacity=".35" stroke-width="2"/>
+  <path d="M985 169 862 347h83l-30 151 149-218h-90z" fill="#d9ed99"/>
+  <text x="90" y="225" fill="#eef4e3" font-family="Arial, sans-serif" font-size="82" font-weight="700">Industrial<tspan font-weight="400">IQ</tspan></text>
+  <text x="95" y="300" fill="#c6d5bc" font-family="Arial, sans-serif" font-size="25" letter-spacing="5">IGNITION CORE LEARNING TRACK</text>
+  <text x="95" y="410" fill="#dce8cf" font-family="Arial, sans-serif" font-size="34">Original practice. Local progress.</text>
+  <text x="95" y="465" fill="#dce8cf" font-family="Arial, sans-serif" font-size="34">Open knowledge for industry.</text>
+</svg>
