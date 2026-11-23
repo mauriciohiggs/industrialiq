@@ -2,9 +2,20 @@
 
 IndustrialIQ is envisioned as an industrial competency platform. Its first learning track is a free, open-source, local-first study companion for Ignition 8.1, built with React, TypeScript, and Vite. No account, backend, database, API keys, or paid services are required today.
 
-The first course, Industrial Automation > Ignition Core, organizes its existing questions into nine learning modules. TypeScript graph models, an illustrative readiness service, and a mock mentor are foundations only: the app does not yet have curated skill mappings, competency tracking, readiness prediction, or AI coaching. Cybersecurity, Engineering, Manufacturing, and SaaS plans are **planned, not implemented**.
+The first course, Industrial Automation > Ignition Core, organizes its existing questions into nine learning modules. The app now includes live browser-local competency, career, and certification practice summaries through its mentor and Certification GPS. The runtime graph is derived from categories and is not yet a curated, versioned model; Diagnostic, Adaptive, and Simulation engines are implemented but not connected to the learner UI. Cybersecurity, Engineering, Manufacturing, and SaaS plans are **planned, not implemented**.
 
-See the [migration notes](INDUSTRIALIQ_MIGRATION.md), [roadmap](ROADMAP.md), and [platform strategy](INDUSTRIALIQ_STRATEGY.md).
+## Architecture and platform knowledge
+
+Read [docs/PROJECT_BRAIN.md](docs/PROJECT_BRAIN.md) first. It is the single source of truth for the implemented platform.
+
+- [System Registry](docs/SYSTEM_REGISTRY.md)
+- [Architecture Map](docs/ARCHITECTURE_MAP.md)
+- [Knowledge Graph](docs/KNOWLEDGE_GRAPH.md)
+- [Decisions](docs/DECISIONS.md)
+- [Current State](docs/CURRENT_STATE.md)
+- [Roadmap](docs/ROADMAP.md)
+
+The earlier [migration notes](INDUSTRIALIQ_MIGRATION.md), [root roadmap](ROADMAP.md), and [platform strategy](INDUSTRIALIQ_STRATEGY.md) remain useful historical/design context; the `docs/` directory takes precedence for current-state claims.
 
 **Independent community project.** Not affiliated with or endorsed by Inductive Automation. Ignition is a trademark of Inductive Automation. These are original practice questions, not real certification questions or exam dumps. The simulator does not reproduce the official assessment, its weighting, or its difficulty, and does not predict whether you will pass.
 
@@ -30,6 +41,7 @@ The production site is generated in `dist`. Serve it over HTTP; do not open `ind
 
 ## What's included
 
+- **AI Mentor dashboard (local-first, optional provider):** an actionable overview with readiness, weak areas, recommended tasks, a seven-day study plan, skill progress, and an evidence-limited certification forecast. Template coaching is the default; an optional constrained provider may be configured. The mentor uses browser-local practice history and never presents a practice score as a pass probability.
 - **72 original questions / flashcards** across Gateway, Vision, Perspective, Tags, Security, Reporting, Historian, Transaction Groups, and Alarming.
 - **Spaced-repetition flashcards:** reveal the answer, then choose Again, Hard, Good, or Easy.
 - **Lightning review:** up to 100 available cards, with automatic answer reveal after 15 seconds. Rate your recall manually; a timeout is not silently recorded as a correct answer.
@@ -41,6 +53,30 @@ The production site is generated in `dist`. Serve it over HTTP; do not open `ind
 - **Real analytics:** recent accuracy, a color-coded topic map, study streaks, activity calendar, and earned milestones.
 - **Portable progress:** browser storage, JSON export/import, and explicit reset.
 - Responsive interface, keyboard-accessible native controls, a skip link, visible focus states, and reduced-motion support.
+
+### AI Mentor routes and data requirements
+
+The mentor is implemented as `#/mentor` routes without a routing dependency:
+
+| Route | UI |
+| --- | --- |
+| `#/mentor/overview` | Readiness snapshot, weak areas, next tasks, weekly rhythm, forecast preview |
+| `#/mentor/readiness` | Evidence count, coverage, confidence, and explainable score inputs |
+| `#/mentor/study-plan` | Seven-day focused plan and prioritized daily sessions |
+| `#/mentor/skills` | Recent accuracy, answer count, and coverage for each Ignition topic |
+| `#/mentor/forecast` | Milestones and an evidence-limited planning estimate |
+
+The current dashboard derives `MentorDashboardData` from the existing `Progress` record and bundled questions; no network data is required. A production mentor service would need:
+
+- Learner: identifier, locale, timezone, active course version, and target certification version.
+- Evidence: immutable assessed-response IDs, content versions, correctness, timestamps, confidence, and reviewed competency mappings. Flashcard self-ratings must remain a separate evidence class.
+- Competency graph: versioned skills, assessable competencies, prerequisites, weights, and course/certification relationships.
+- Planning: target date, weekly availability, due reviews, preferred session length, and completion state.
+- Readiness: algorithm/model version, nullable score, evidence coverage, uncertainty, explanation, and an explicit `insufficient` state.
+- Forecast: target milestone, estimated range, assumptions, recency cutoff, and disclaimers. Do not expose a pass prediction until a calibrated, monitored model exists.
+- Coach: opt-in consent, approved source citations, policy/model version, session messages, failure state, and retention controls.
+
+The TypeScript contracts live in `src/mentor/models.ts`; the browser-local transformation is in `src/mentor/dashboardData.ts`; the responsive React UI is in `src/components/MentorDashboard.tsx`.
 
 Smaller topic banks use all available questions without duplication: for example, a Security-only exam currently has eight questions. The 50-question mixed exam is a study convention, not a claim about the official certification format.
 
@@ -92,3 +128,20 @@ Core logic lives in [src/lib/study.ts](src/lib/study.ts), import validation in [
 Application code, original questions, and original documentation are [MIT licensed](LICENSE). Dependencies and bundled fonts retain their respective licenses; see [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
 
 Questions were independently authored as concept exercises using the public [Ignition 8.1 documentation](https://www.docs.inductiveautomation.com/docs/8.1) as reference. No documentation text or official exam content is included. Every topic links to its official reference from the app. Check current documentation for version-specific behavior and use hands-on projects alongside this guide.
+## Optional mentor provider
+
+The mentor uses local, evidence-based template coaching by default. To enable an
+OpenAI-compatible chat-completions provider, configure:
+
+```text
+VITE_MENTOR_API_BASE_URL=https://your-provider.example/v1
+VITE_MENTOR_MODEL=your-model
+VITE_MENTOR_API_KEY=optional-api-key
+```
+
+`VITE_OPENAI_BASE_URL`, `VITE_OPENAI_MODEL`, and `VITE_OPENAI_API_KEY` are also
+accepted. Prefer a same-origin authenticated proxy rather than placing a
+production secret in a Vite client environment. Provider responses are required
+to use strict JSON schema output and are independently validated. Invalid output
+falls back to local template coaching, and resource actions can only reference
+the flashcards and practice tasks already supplied by the dashboard.

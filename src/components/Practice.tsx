@@ -1,7 +1,9 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { ArrowLeft, ArrowRight, Check, CircleCheck, CircleX, Clock3, Flag, RotateCcw, Target } from 'lucide-react'
 import { categories, sourceFor } from '../data/categories'
 import { questions } from '../data/bank'
+import { analyticsService, createAnalyticsId } from '../analytics/analyticsService'
+import { ignitionCoreCourse, ignitionCoreModules } from '../courses/industrial-automation/ignition-core/course'
 import { addActivity, categoryStats, createQuiz, filterBank, gradeQuiz } from '../lib/study'
 import type { Progress, QuizSession, StudyFilter } from '../types'
 
@@ -28,19 +30,63 @@ function PracticeInner({ progress, onSave, initialFilter, initialMode }: Omit<Pr
   const [results, setResults] = useState<Results | null>(null)
   const [clock, setClock] = useState(Date.now)
   const [confirmEnd, setConfirmEnd] = useState(false)
+  const attemptRef = useRef<{ id: string; startedAt: number } | null>(null)
+  const finishingRef = useRef(false)
   const pool = filterBank(questions, filter, progress)
   const questionCount = Math.min(mode === 'exam' ? 50 : count, pool.length)
   const finish = useCallback((active: QuizSession, expired = false) => {
+    if (finishingRef.current) return
+    finishingRef.current = true
     const now = Date.now()
+    const graded = gradeQuiz(active.questions, active.selections, now)
+    const attempt = attemptRef.current ?? { id: createAnalyticsId(), startedAt: now }
+    for (const question of active.questions) {
+      const selection = active.selections[question.id]
+      const module = ignitionCoreModules.find((item) => item.title === question.category)
+      if (selection !== undefined) {
+        analyticsService.track('Question Answered', {
+          courseId: ignitionCoreCourse.id,
+          examId: attempt.id,
+          moduleId: module?.id ?? question.category,
+          questionId: question.id,
+          mode: active.mode,
+          correct: selection === question.correct,
+        })
+      }
+      if (selection !== question.correct) {
+        analyticsService.track('Question Missed', {
+          courseId: ignitionCoreCourse.id,
+          examId: attempt.id,
+          moduleId: module?.id ?? question.category,
+          questionId: question.id,
+          mode: active.mode,
+          unanswered: selection === undefined,
+        })
+      }
+    }
+    if (active.mode === 'exam') {
+      analyticsService.track('Exam Finished', {
+        courseId: ignitionCoreCourse.id,
+        examId: attempt.id,
+        moduleFilter: filter,
+        questionCount: graded.total,
+        answeredCount: Object.keys(active.selections).length,
+        correctCount: graded.correct,
+        incorrectCount: graded.total - graded.correct,
+        scorePercent: graded.percentage,
+        durationSeconds: Math.max(0, Math.round((now - attempt.startedAt) / 1000)),
+        expired,
+      })
+    }
     onSave({
       ...progress,
-      answers: [...progress.answers, ...gradeQuiz(active.questions, active.selections, now).answers].slice(-2000),
+      answers: [...progress.answers, ...graded.answers].slice(-2000),
       activity: addActivity(progress, now),
     })
     setResults({ session: active, expired })
     setSession(null)
     setConfirmEnd(false)
-  }, [onSave, progress])
+  }, [filter, onSave, progress])
 
   useEffect(() => {
     if (!session?.deadline) return
@@ -54,11 +100,25 @@ function PracticeInner({ progress, onSave, initialFilter, initialMode }: Omit<Pr
 
   function start() {
     const now = Date.now()
+    const quiz = createQuiz(pool, mode === 'exam' ? 50 : count)
+    const attempt = { id: createAnalyticsId(), startedAt: now }
+    attemptRef.current = attempt
+    finishingRef.current = false
+    if (mode === 'exam') {
+      analyticsService.track('Exam Started', {
+        courseId: ignitionCoreCourse.id,
+        examId: attempt.id,
+        moduleFilter: filter,
+        questionCount: quiz.length,
+        timed,
+        durationSeconds: timed ? 90 * 60 : null,
+      })
+    }
     setClock(now)
     setResults(null)
     setConfirmEnd(false)
     setSession({
-      questions: createQuiz(pool, mode === 'exam' ? 50 : count),
+      questions: quiz,
       selections: {}, index: 0, mode, deadline: mode === 'exam' && timed ? now + 90 * 60_000 : null, revealed: false,
     })
   }

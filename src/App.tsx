@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState } from 'react'
-import { ArrowDownToLine, ArrowRight, BookOpen, ChartNoAxesCombined, Check, ChevronRight, CircleHelp, Code2, Download, ExternalLink, FileQuestion, Flame, Globe, Heart, LayoutDashboard, Layers3, Menu, Search, ShieldCheck, Target, Upload, Users, X, Zap } from 'lucide-react'
+import { ArrowDownToLine, ArrowRight, BookOpen, BrainCircuit, ChartNoAxesCombined, Check, ChevronRight, CircleHelp, Code2, Download, ExternalLink, FileQuestion, Flame, Globe, Heart, LayoutDashboard, Layers3, Menu, Search, ShieldCheck, Target, Upload, Users, X, Zap } from 'lucide-react'
 import { Analytics } from './components/Analytics'
 import { Dashboard } from './components/Dashboard'
 import { Flashcards } from './components/Flashcards'
+import { MentorDashboard, type MentorView } from './components/MentorDashboard'
 import { Practice } from './components/Practice'
 import { TopicIcon } from './components/TopicIcon'
 import { questions } from './data/bank'
@@ -10,20 +11,32 @@ import { categories, sourceFor } from './data/categories'
 import { emptyProgress, streak } from './lib/study'
 import { loadProgress, parseProgress, STORAGE_KEY } from './lib/storage'
 import { useNow } from './lib/useNow'
+import { analyticsService } from './analytics/analyticsService'
+import { ignitionCoreCourse, ignitionCoreModules } from './courses/industrial-automation/ignition-core/course'
 import type { Progress, StudyFilter } from './types'
 import license from '../LICENSE?raw'
 import './App.css'
 
-type Page = 'overview' | 'flashcards' | 'practice' | 'bank' | 'analytics' | 'community'
+type Page = 'overview' | 'mentor' | 'flashcards' | 'practice' | 'bank' | 'analytics' | 'community'
 const navigation = [
+  { id: 'mentor', label: 'AI Mentor', icon: BrainCircuit },
   { id: 'overview', label: 'Overview', icon: LayoutDashboard },
   { id: 'flashcards', label: 'Flashcards', icon: Layers3 },
   { id: 'practice', label: 'Practice & exams', icon: Target },
   { id: 'bank', label: 'Learning modules', icon: BookOpen },
   { id: 'analytics', label: 'My progress', icon: ChartNoAxesCombined },
 ] as const
-const titles: Record<Page, string> = { overview: 'Study dashboard', flashcards: 'Flashcards', practice: 'Practice & exams', bank: 'Learning modules', analytics: 'My progress', community: 'The open study project' }
+const titles: Record<Page, string> = { overview: 'Study dashboard', mentor: 'AI Mentor', flashcards: 'Flashcards', practice: 'Practice & exams', bank: 'Learning modules', analytics: 'My progress', community: 'The open study project' }
 const issuesUrl = 'https://github.com/mauriciohiggs/industrialiq/issues/new'
+const mentorViews: MentorView[] = ['overview', 'readiness', 'study-plan', 'skills', 'forecast']
+const pages: Page[] = ['overview', 'mentor', 'flashcards', 'practice', 'bank', 'analytics', 'community']
+
+function routeFromHash(): { page: Page; mentorView: MentorView } {
+  const [pagePart, mentorPart] = window.location.hash.replace(/^#\/?/, '').split('/')
+  const page = !pagePart ? 'mentor' : pages.includes(pagePart as Page) ? pagePart as Page : 'overview'
+  const mentorView = mentorViews.includes(mentorPart as MentorView) ? mentorPart as MentorView : 'overview'
+  return { page, mentorView }
+}
 
 function download(filename: string, text: string) {
   const url = URL.createObjectURL(new Blob([text], { type: 'application/json' }))
@@ -35,13 +48,15 @@ function download(filename: string, text: string) {
 }
 
 function App() {
+  const initialRoute = routeFromHash()
   const [loaded] = useState(loadProgress)
   const now = useNow()
   const [progress, setProgress] = useState(loaded.progress)
   const [storageError, setStorageError] = useState(loaded.error)
   const [saveBlocked, setSaveBlocked] = useState(!!loaded.error)
   const [notice, setNotice] = useState('')
-  const [page, setPage] = useState<Page>('overview')
+  const [page, setPage] = useState<Page>(initialRoute.page)
+  const [mentorView, setMentorView] = useState<MentorView>(initialRoute.mentorView)
   const [mobileMenu, setMobileMenu] = useState(false)
   const [search, setSearch] = useState('')
   const [bankFilter, setBankFilter] = useState<StudyFilter>('All topics')
@@ -51,24 +66,68 @@ function App() {
   const importRef = useRef<HTMLInputElement>(null)
   const contentRef = useRef<HTMLElement>(null)
   const sidebarRef = useRef<HTMLElement>(null)
+  const trackedViewRef = useRef('')
 
   useEffect(() => {
     if (mobileMenu) sidebarRef.current?.querySelector<HTMLButtonElement>('button')?.focus()
   }, [mobileMenu])
+
+  useEffect(() => {
+    const viewKey = page === 'mentor' ? `${page}:${mentorView}` : page
+    if (trackedViewRef.current === viewKey) return
+    trackedViewRef.current = viewKey
+    if (page === 'mentor') {
+      analyticsService.track('Mentor Viewed', { courseId: ignitionCoreCourse.id, view: mentorView })
+    }
+    if (page === 'bank') {
+      analyticsService.track('Course Opened', {
+        courseId: ignitionCoreCourse.id,
+        courseName: ignitionCoreCourse.title,
+        source: 'learning-library',
+      })
+    }
+  }, [mentorView, page])
+
+  useEffect(() => {
+    const syncRoute = () => {
+      const route = routeFromHash()
+      setPage(route.page)
+      setMentorView(route.mentorView)
+      contentRef.current?.scrollTo({ top: 0 })
+    }
+    window.addEventListener('hashchange', syncRoute)
+    window.addEventListener('popstate', syncRoute)
+    return () => {
+      window.removeEventListener('hashchange', syncRoute)
+      window.removeEventListener('popstate', syncRoute)
+    }
+  }, [])
 
   function closeMenu() {
     setMobileMenu(false)
     contentRef.current?.focus({ preventScroll: true })
   }
 
-  function navigate(next: Page) {
+  function navigate(next: Page, nextMentorView: MentorView = mentorView) {
     setPage(next)
+    if (next === 'mentor') setMentorView(nextMentorView)
+    const path = next === 'mentor' ? `#/mentor/${nextMentorView}` : `#/${next}`
+    if (window.location.hash !== path) window.history.pushState(null, '', path)
     setMobileMenu(false)
     contentRef.current?.scrollTo({ top: 0 })
     if (mobileMenu) contentRef.current?.focus({ preventScroll: true })
   }
 
   function startPractice(filter: StudyFilter = 'All topics', mode: 'practice' | 'exam' = 'practice') {
+    const module = ignitionCoreModules.find((item) => item.title === filter)
+    if (module) {
+      analyticsService.track('Module Opened', {
+        courseId: ignitionCoreCourse.id,
+        moduleId: module.id,
+        moduleName: module.title,
+        source: mode === 'exam' ? 'exam-setup' : 'practice-setup',
+      })
+    }
     setPracticeSetup({ filter, mode, version: practiceSetup.version + 1 })
     navigate('practice')
   }
@@ -146,15 +205,35 @@ function App() {
         <h1 className="sr-only">{titles[page]}</h1>
         {storageError && <div className="notice error-notice" role="alert">{storageError} <button className="text-button" onClick={exportProgress}>Export data</button></div>}
         {notice && <div className="notice" role="status">{notice}<button className="icon-button" aria-label="Dismiss notification" onClick={() => setNotice('')}><X size={16} /></button></div>}
+        <section hidden={page !== 'mentor'} aria-label="AI mentor dashboard"><MentorDashboard progress={progress} now={now} view={mentorView} onViewChange={(nextView) => navigate('mentor', nextView)} onFlashcards={() => navigate('flashcards')} onPractice={startPractice} onLibrary={() => navigate('bank')} /></section>
         <section hidden={page !== 'overview'} aria-label="Study dashboard"><Dashboard progress={progress} now={now} onFlashcards={() => navigate('flashcards')} onPractice={startPractice} onBank={() => navigate('bank')} onAnalytics={() => navigate('analytics')} /></section>
         <section hidden={page !== 'flashcards'} aria-label="Flashcards"><Flashcards key={dataVersion} progress={progress} now={now} onSave={save} /></section>
         <section hidden={page !== 'practice'} aria-label="Practice and exams"><Practice key={dataVersion} progress={progress} onSave={save} initialFilter={practiceSetup.filter} initialMode={practiceSetup.mode} filterVersion={practiceSetup.version} /></section>
         <section hidden={page !== 'analytics'} aria-label="Progress analytics"><Analytics progress={progress} now={now} /></section>
         <section hidden={page !== 'bank'} className="page-content">
           <div className="section-heading"><div><span className="eyebrow">INDUSTRIAL AUTOMATION / IGNITION CORE</span><h2>Nine learning modules. One open library.</h2><p>{questions.length} original questions, each with an explanation. Explore freely or build a focused drill.</p></div><BookOpen className="heading-icon" /></div>
-          <div className="bank-filters"><label className="bank-search"><Search size={17} /><input type="search" aria-label="Filter questions" placeholder="Find a concept, question, or topic..." value={search} onChange={(event) => setSearch(event.target.value)} /></label><label className="sr-only" htmlFor="bank-category">Filter by topic</label><select id="bank-category" value={bankFilter} onChange={(event) => setBankFilter(event.target.value as StudyFilter)}><option>All topics</option>{categories.map((category) => <option key={category.name}>{category.name}</option>)}</select><button className="button primary" onClick={() => startPractice(bankFilter)}>Practice this selection <ArrowRight size={15} /></button></div>
+          <div className="bank-filters"><label className="bank-search"><Search size={17} /><input type="search" aria-label="Filter questions" placeholder="Find a concept, question, or topic..." value={search} onChange={(event) => setSearch(event.target.value)} /></label><label className="sr-only" htmlFor="bank-category">Filter by topic</label><select id="bank-category" value={bankFilter} onChange={(event) => {
+            const next = event.target.value as StudyFilter
+            setBankFilter(next)
+            const module = ignitionCoreModules.find((item) => item.title === next)
+            if (module) analyticsService.track('Module Opened', {
+              courseId: ignitionCoreCourse.id,
+              moduleId: module.id,
+              moduleName: module.title,
+              source: 'learning-library-filter',
+            })
+          }}><option>All topics</option>{categories.map((category) => <option key={category.name}>{category.name}</option>)}</select><button className="button primary" onClick={() => startPractice(bankFilter)}>Practice this selection <ArrowRight size={15} /></button></div>
           <p className="muted small">{filteredQuestions.length} {filteredQuestions.length === 1 ? 'question' : 'questions'} shown. Search filters this library; drills use the selected topic.</p>
-          <div className="bank-list">{filteredQuestions.map((question) => <details className="panel bank-question" key={question.id}><summary><span className="topic-icon teal"><TopicIcon category={question.category} size={18} /></span><span><small>{question.category} <span className="question-id">/ {question.id}</span></small><strong>{question.question}</strong></span><span className="expand-plus">+</span></summary><div className="review-detail"><h4>{question.options[question.correct]}</h4><p>{question.explanation}</p><div className="review-actions"><a href={sourceFor(question.category)} target="_blank" rel="noreferrer">Read the official topic reference <ExternalLink size={14} /></a><a href={`${issuesUrl}?template=question-report.yml&title=${encodeURIComponent(`[Question]: ${question.id}`)}`} target="_blank" rel="noreferrer">Report this question <ExternalLink size={14} /></a></div></div></details>)}</div>
+          <div className="bank-list">{filteredQuestions.map((question) => <details className="panel bank-question" key={question.id} onToggle={(event) => {
+            if (!event.currentTarget.open) return
+            const module = ignitionCoreModules.find((item) => item.title === question.category)
+            if (module) analyticsService.track('Module Opened', {
+              courseId: ignitionCoreCourse.id,
+              moduleId: module.id,
+              moduleName: module.title,
+              source: `question:${question.id}`,
+            })
+          }}><summary><span className="topic-icon teal"><TopicIcon category={question.category} size={18} /></span><span><small>{question.category} <span className="question-id">/ {question.id}</span></small><strong>{question.question}</strong></span><span className="expand-plus">+</span></summary><div className="review-detail"><h4>{question.options[question.correct]}</h4><p>{question.explanation}</p><div className="review-actions"><a href={sourceFor(question.category)} target="_blank" rel="noreferrer">Read the official topic reference <ExternalLink size={14} /></a><a href={`${issuesUrl}?template=question-report.yml&title=${encodeURIComponent(`[Question]: ${question.id}`)}`} target="_blank" rel="noreferrer">Report this question <ExternalLink size={14} /></a></div></div></details>)}</div>
           {filteredQuestions.length === 0 && <div className="panel completion"><FileQuestion size={35} /><h3>No matching questions.</h3><p>Try another phrase or choose a different topic.</p></div>}
         </section>
         <section hidden={page !== 'community'} className="page-content">
@@ -167,7 +246,7 @@ function App() {
           <div className="independent-note"><ShieldCheck size={22} /><p><strong>Independent by design.</strong> Not affiliated with, endorsed by, or sponsored by Inductive Automation. Ignition is a trademark of Inductive Automation. These original questions are not official certification questions, exam dumps, or a guarantee of passing. This is a learning aid, not production engineering advice.</p></div>
           <details className="panel license-panel"><summary><Check size={17} /> MIT license / use, modify, and share</summary><pre>{license}</pre></details>
         </section>
-        <footer className="app-footer"><span><Zap size={13} /> IndustrialIQ <span className="footer-dot">/</span> Ignition Core learning track</span><nav className="footer-links" aria-label="Project"><a href={`${issuesUrl}?template=user-feedback.yml`} target="_blank" rel="noreferrer">Feedback</a><a href="./roadmap.html">Roadmap</a><a href="./privacy.html">Privacy</a><a href="./terms.html">Terms</a><a href="./disclaimer.html">Disclaimer</a><button className="text-button" onClick={() => navigate('community')}>About the project <ArrowRight size={13} /></button></nav></footer>
+        <footer className="app-footer"><span><Zap size={13} /> IndustrialIQ <span className="footer-dot">/</span> Ignition Core learning track</span><nav className="footer-links" aria-label="Project"><a href={`${issuesUrl}?template=user-feedback.yml`} target="_blank" rel="noreferrer">Feedback</a><a href="./roadmap.html" onClick={() => analyticsService.track('Roadmap Viewed', { source: 'app-footer' })}>Roadmap</a><a href="./privacy.html">Privacy</a><a href="./terms.html">Terms</a><a href="./disclaimer.html">Disclaimer</a><button className="text-button" onClick={() => navigate('community')}>About the project <ArrowRight size={13} /></button></nav></footer>
       </main>
     </div>
   </div>

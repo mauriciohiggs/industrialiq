@@ -1,7 +1,9 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { ArrowLeft, ArrowRight, Check, Clock3, RotateCcw, Sparkles, Zap } from 'lucide-react'
 import { categories, sourceFor } from '../data/categories'
 import { questions } from '../data/bank'
+import { analyticsService } from '../analytics/analyticsService'
+import { ignitionCoreCourse, ignitionCoreModules } from '../courses/industrial-automation/ignition-core/course'
 import { addActivity, filterBank, reviewQueue, scheduleCard } from '../lib/study'
 import type { Progress, Question, Rating, StudyFilter } from '../types'
 
@@ -17,6 +19,19 @@ function ReviewCard({ question, lightning, progress, onRate }: {
   const [revealed, setRevealed] = useState(false)
   const [deadline] = useState(() => Date.now() + 15_000)
   const [now, setNow] = useState(Date.now)
+  const viewed = useRef(false)
+  useEffect(() => {
+    if (viewed.current) return
+    viewed.current = true
+    const module = ignitionCoreModules.find((item) => item.title === question.category)
+    analyticsService.track('Flashcard Viewed', {
+      courseId: ignitionCoreCourse.id,
+      moduleId: module?.id ?? question.category,
+      questionId: question.id,
+      reviewNumber: (progress.cards[question.id]?.reviews ?? 0) + 1,
+      lightning,
+    })
+  }, [lightning, progress.cards, question])
   useEffect(() => {
     if (!lightning || revealed) return
     const timer = setInterval(() => setNow(Date.now()), 250)
@@ -73,6 +88,19 @@ export function Flashcards({ progress, now, onSave }: Props) {
     if (!queue) return
     const question = queue[index]
     const now = Date.now()
+    const module = ignitionCoreModules.find((item) => item.title === question.category)
+    const reviewNumber = (progress.cards[question.id]?.reviews ?? 0) + 1
+    const eventProperties = {
+      courseId: ignitionCoreCourse.id,
+      moduleId: module?.id ?? question.category,
+      questionId: question.id,
+      reviewNumber,
+    }
+    if (rating === 'again') {
+      analyticsService.track('Flashcard Incorrect', { ...eventProperties, rating })
+    } else {
+      analyticsService.track('Flashcard Correct', { ...eventProperties, rating })
+    }
     onSave({
       ...progress,
       cards: { ...progress.cards, [question.id]: scheduleCard(progress.cards[question.id], rating, now) },
